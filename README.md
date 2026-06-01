@@ -83,418 +83,276 @@ The controller must:
 
 # Mathematical Modeling
 
-# 1. Nonlinear Orbital Dynamics
+## 1. Nonlinear Orbital Dynamics
 
-The spacecraft dynamics are derived from Newton’s Second Law in an inertial geocentric frame:
+The spacecraft motion is modeled using Newton’s Second Law in an inertial geocentric frame:
 
-[
-\vec{a} = \vec{a}*{kep} + \vec{a}*{J2} + \vec{a}*{atm} + \vec{a}*{prop}
-]
+```text
+a = a_kep + a_J2 + a_atm + a_prop
+```
 
-where:
+Where:
 
-| Term               | Description                          |
-| ------------------ | ------------------------------------ |
-| ( \vec{a}_{kep} )  | Keplerian gravitational acceleration |
-| ( \vec{a}_{J2} )   | Earth oblateness perturbation        |
-| ( \vec{a}_{atm} )  | Atmospheric drag                     |
-| ( \vec{a}_{prop} ) | Propulsion acceleration              |
-
----
-
-## Keplerian Acceleration
-
-The central gravitational field is modeled as:
-
-[
-\vec{a}_{kep} = -\mu \frac{\vec{r}}{r^3}
-]
-
-where:
-
-* ( \mu ) = Earth's gravitational parameter
-* ( \vec{r} ) = satellite position vector
+| Term     | Description                          |
+| -------- | ------------------------------------ |
+| `a_kep`  | Keplerian gravitational acceleration |
+| `a_J2`   | Earth oblateness perturbation        |
+| `a_atm`  | Atmospheric drag acceleration        |
+| `a_prop` | Propulsion acceleration              |
 
 ---
 
-## J2 Perturbation
+# Keplerian Gravitational Model
 
-Earth is not perfectly spherical.
+The central gravitational acceleration is:
 
-Its equatorial bulge introduces a perturbation represented by the second zonal harmonic coefficient (J_2):
+```text
+a_kep = -μ r / |r|³
+```
 
-[
-\vec{a}*{J2} =
-\frac{1}{2}\mu J_2 R*{eq}^2
-\left(
-\frac{3}{r^5} -
-\frac{15z^2}{r^7}
-\right)\vec{r}
-]
+Where:
 
-The J2 perturbation causes:
-
-* orbital plane precession,
-* drift in orbital parameters,
-* long-term trajectory deviation.
+| Variable | Value                     |
+| -------- | ------------------------- |
+| `μ`      | 3.986004418 × 10¹⁴ m³/s²  |
+| `r`      | Satellite position vector |
 
 ---
 
-## Atmospheric Drag
+# Satellite Physical Parameters
 
-Atmospheric drag is modeled as:
+The project uses the physical characteristics of the MICROSCOPE satellite:
 
-[
-\vec{a}_{atm} =
--\frac{\rho}{2m}SC_Dv^2\frac{\vec{v}}{v}
-]
+| Parameter                | Value             |
+| ------------------------ | ----------------- |
+| Satellite Mass `m`       | 191.1 kg          |
+| Drag Coefficient `C_D`   | 2                 |
+| Cross-sectional Area `S` | 2 m²              |
+| Atmospheric Density `ρ₀` | 6.3 × 10⁻¹³ kg/m³ |
 
-where:
-
-| Parameter | Description                    |
-| --------- | ------------------------------ |
-| ( \rho )  | Atmospheric density            |
-| ( S )     | Satellite cross-sectional area |
-| ( C_D )   | Drag coefficient               |
-| ( m )     | Satellite mass                 |
-
-Atmospheric drag progressively reduces orbital altitude and velocity.
+These values were extracted directly from the project statement.
 
 ---
 
-# State-Space Representation
+# Reference Orbit Parameters
 
-The nonlinear state vector is:
+The desired reference orbit is defined by:
 
-[
-X =
-\begin{bmatrix}
-x & y & z & \dot{x} & \dot{y} & \dot{z}
-\end{bmatrix}^T
-]
+| Orbital Parameter       | Value   |
+| ----------------------- | ------- |
+| Semi-major axis `a`     | 7068 km |
+| Eccentricity `e`        | 0       |
+| Inclination `i`         | 0 rad   |
+| RAAN `Ω`                | 0 rad   |
+| Argument of Perigee `ω` | 0 rad   |
+| True Anomaly `ν₀`       | 0 rad   |
 
-The nonlinear system is represented as:
+This corresponds to a circular Low Earth Orbit (LEO).
 
-[
-\dot{X} = f(X,U,W)
-]
+---
 
-where:
+# Orbital Position Equation
 
-* (U) = control input,
-* (W) = perturbation vector.
+The orbital radius is:
+
+```text
+r = a(1 - e²) / (1 + e cos(ν))
+```
+
+Where:
+
+| Variable | Description          |
+| -------- | -------------------- |
+| `a`      | Semi-major axis      |
+| `e`      | Orbital eccentricity |
+| `ν`      | True anomaly         |
+
+---
+
+# Orbital Mean Motion
+
+The orbital mean motion is:
+
+```text
+n = √(μ / a³)
+```
+
+For the reference orbit:
+
+| Quantity           | Approximate Value    |
+| ------------------ | -------------------- |
+| Orbital Radius     | 7068 km              |
+| Mean Motion `n`    | ≈ 0.00106 rad/s      |
+| Orbital Period `T` | ≈ 5926 s (~98.8 min) |
+
+---
+
+# Atmospheric Drag Model
+
+Atmospheric drag acceleration is modeled as:
+
+```text
+a_atm = -(ρ / 2m) S C_D v² (v / |v|)
+```
+
+Where:
+
+| Variable | Description          |
+| -------- | -------------------- |
+| `ρ`      | Atmospheric density  |
+| `m`      | Satellite mass       |
+| `S`      | Cross-sectional area |
+| `C_D`    | Drag coefficient     |
+| `v`      | Relative velocity    |
+
+Atmospheric drag causes progressive orbital decay and energy dissipation.
 
 ---
 
 # Relative Orbital Motion
 
-To synthesize the controller, the nonlinear dynamics are linearized around a circular reference orbit.
+The relative position between the target satellite and the chaser satellite is expressed in the Local Orbital Frame:
 
-The relative position between the target and chaser satellites is expressed in the local orbital frame:
+```text
+Δr = [ ξ  η  ζ ]ᵀ
+```
 
-[
-\Delta r =
-\begin{bmatrix}
-\xi & \eta & \zeta
-\end{bmatrix}^T
-]
+Where:
 
-where:
-
-| Coordinate | Direction   |
-| ---------- | ----------- |
-| ( \xi )    | Radial      |
-| ( \eta )   | Along-track |
-| ( \zeta )  | Cross-track |
+| Coordinate | Direction             |
+| ---------- | --------------------- |
+| `ξ`        | Radial direction      |
+| `η`        | Along-track direction |
+| `ζ`        | Cross-track direction |
 
 ---
 
 # Clohessy-Wiltshire (Hill) Equations
 
-The resulting linearized dynamics are:
-
-[
-\ddot{\xi} = 2n\dot{\eta} + 3n^2\xi + u_{\xi}
-]
-
-[
-\ddot{\eta} = -2n\dot{\xi} + u_{\eta}
-]
-
-[
-\ddot{\zeta} = -n^2\zeta + u_{\zeta}
-]
-
-where:
-
-[
-n = \sqrt{\frac{\mu}{a^3}}
-]
-
-is the orbital mean motion.
-
-These equations describe the relative dynamics of two nearby spacecraft in orbit.
-
----
-
-# Linear State-Space Model
-
-The system is rewritten in state-space form:
-
-[
-\dot{x} = Ax + Bu
-]
-
-with:
-
-[
-x =
-\begin{bmatrix}
-\xi & \eta & \zeta & \dot{\xi} & \dot{\eta} & \dot{\zeta}
-\end{bmatrix}^T
-]
-
-This linearized model is used for controller synthesis.
-
----
-
-# Control Design — LQR
-
-A Linear Quadratic Regulator (LQR) is used to compute the optimal feedback gain matrix (K).
-
-The control law is:
-
-[
-u = -Kx
-]
-
-The controller minimizes the quadratic cost function:
-
-[
-J =
-\int_0^\infty
-(x^TQx + u^TRu),dt
-]
-
-which balances:
-
-* trajectory accuracy,
-* control effort,
-* system stability.
-
----
-
-# MATLAB Implementation
-
-Example controller synthesis:
-
-```matlab
-A = [...];
-B = [...];
-
-Q = eye(6);
-R = 1e12*eye(3);
-
-K = lqr(A,B,Q,R);
-```
-
----
-
-# Simulation Architecture
-
-The Simulink environment includes:
-
-* Nonlinear orbital propagator
-* J2 perturbation model
-* Atmospheric drag model
-* Relative frame transformation
-* Linearized synthesis model
-* LQR controller
-* Closed-loop validation environment
-
----
-
-# Orbital Parameters
-
-Reference orbit used in simulations:
-
-| Parameter           | Value   |
-| ------------------- | ------- |
-| Semi-major axis     | 7068 km |
-| Eccentricity        | 0       |
-| Inclination         | 0 rad   |
-| RAAN                | 0 rad   |
-| Argument of perigee | 0 rad   |
-| True anomaly        | 0 rad   |
-
----
-
-# Simulation Results
-
-The simulations demonstrate:
-
-## Open Loop
-
-Without control:
-
-* relative orbit diverges,
-* perturbations accumulate,
-* orbital drift increases.
-
-## Closed Loop
-
-With LQR control:
-
-* relative motion stabilizes,
-* orbital deviation is corrected,
-* perturbation effects are mitigated,
-* fuel-efficient station-keeping is achieved.
-
----
-
-# Repository Structure
+After linearization around the circular orbit, the relative dynamics become:
 
 ```text
-├── matlab/
-│   ├── orbital_conversion.m
-│   ├── nonlinear_dynamics.m
-│   ├── j2_perturbation.m
-│   ├── atmospheric_drag.m
-│   ├── relative_motion_model.m
-│   ├── lqr_controller.m
-│   └── simulation_scripts/
-│
-├── simulink/
-│   ├── nonlinear_validation_model.slx
-│   ├── synthesis_model.slx
-│   ├── perturbation_models.slx
-│   └── closed_loop_stationkeeping.slx
-│
-├── figures/
-│   ├── open_loop_response.png
-│   ├── closed_loop_response.png
-│   └── orbital_trajectory.png
-│
-├── report/
-│   └── DSAS_Report.pdf
-│
-└── README.md
+ξ¨ = 2nη̇ + 3n²ξ + u_ξ
+η¨ = -2nξ̇ + u_η
+ζ¨ = -n²ζ + u_ζ
+```
+
+These equations describe the relative motion of nearby spacecraft in orbit.
+
+---
+
+# State-Space Representation
+
+The system state vector is:
+
+```text
+x = [ ξ  η  ζ  ξ̇  η̇  ζ̇ ]ᵀ
+```
+
+The linearized system is written as:
+
+```text
+ẋ = Ax + Bu
+```
+
+Where:
+
+| Matrix | Description            |
+| ------ | ---------------------- |
+| `A`    | System dynamics matrix |
+| `B`    | Input matrix           |
+| `u`    | Control input vector   |
+
+---
+
+# LQR Control Law
+
+The controller is synthesized using a Linear Quadratic Regulator (LQR).
+
+The feedback control law is:
+
+```text
+u = -Kx
+```
+
+The gain matrix `K` minimizes the cost function:
+
+```text
+J = ∫ (xᵀQx + uᵀRu) dt
+```
+
+balancing:
+
+* trajectory precision,
+* stabilization performance,
+* propulsion effort.
+
+---
+
+# MATLAB Controller Synthesis
+
+```matlab id="vgm2hf"
+Q = eye(6);
+
+R1 = 1e12 * eye(3);
+R2 = 1e14 * eye(3);
+
+K1 = lqr(A,B,Q,R1);
+K2 = lqr(A,B,Q,R2);
 ```
 
 ---
 
-# Key Engineering Concepts Demonstrated
+# Initial Relative Orbit Test Cases
 
-This project demonstrates practical applications of:
+Two validation scenarios are implemented:
+
+## 1. Eccentricity Offset
+
+| Parameter    | Target | Chaser  |
+| ------------ | ------ | ------- |
+| Eccentricity | 0      | 1.41e-5 |
+
+This generates relative elliptical motion.
+
+---
+
+## 2. True Anomaly Offset
+
+| Parameter    | Target | Chaser      |
+| ------------ | ------ | ----------- |
+| True Anomaly | 0 rad  | 1.41e-5 rad |
+
+This produces phase-shift relative motion along the orbit.
+
+---
+
+# Perturbation Scenarios
+
+The controller is validated under:
+
+* No perturbations
+* Atmospheric drag only
+* J2 perturbation only
+* Combined perturbations
+
+---
+
+# Engineering Significance
+
+This project combines:
 
 * Aerospace dynamics
+* Nonlinear system modeling
 * Orbital mechanics
-* State-space modeling
-* Linearization techniques
-* Relative motion dynamics
-* Robust feedback control
-* LQR optimal control
+* Optimal control theory
+* State-space synthesis
 * MATLAB/Simulink engineering workflows
-* Nonlinear system validation
 
----
+The methodologies used are directly relevant to:
 
-# Industrial Relevance
-
-The methodologies implemented here are directly applicable to:
-
-* spacecraft GNC systems,
-* autonomous rendezvous,
+* autonomous spacecraft guidance,
+* orbital rendezvous,
 * satellite formation flying,
-* orbital maintenance,
-* aerospace autonomy,
-* real-time embedded control systems.
-
-These concepts are widely used in:
-
-* ESA missions,
-* NASA rendezvous systems,
-* autonomous spacecraft docking,
-* CubeSat formation control,
-* defense aerospace applications.
-
----
-
-# Academic Context
-
-Developed within:
-
-### University of Bordeaux
-
-### Master in Complex Systems Engineering
-
-### AM2AS Track
-
-### ENSEIRB-MATMECA
-
-Specialization areas include:
-
-* Automatic Control
-* Aerospace Systems
-* Mechatronics
-* Vehicle Dynamics
-* Robust Control
-* Embedded Systems
-* Dynamic System Modeling
-
----
-
-# Future Improvements
-
-Possible extensions of this work include:
-
-* H∞ robust control
-* Model Predictive Control (MPC)
-* Kalman filtering
-* Nonlinear adaptive control
-* Reaction wheel attitude control
-* Multi-satellite coordination
-* Real-time embedded implementation
-* High-fidelity perturbation models
-* Fault-tolerant spacecraft control
-
----
-
-# References
-
-1. J.P. Carrou — *Mécanique Spatiale*
-2. Montenbruck & Gill — *Satellite Orbits*
-3. M.J. Sidi — *Spacecraft Dynamics and Control*
-4. Sengupta — *Satellite Relative Motion Propagation and Control*
-5. Zarrouati — *Trajectoires Spatiales*
-
----
-
-# Author
-
-## Elijah Boungoueres
-
-M.Sc. Complex Systems Engineering — AM2AS Track
-University of Bordeaux / ENSEIRB-MATMECA
-
-Fields of interest:
-
-* Control Systems
-* Aerospace Dynamics
-* Embedded Systems
-* Mechatronics
-* Robust Control
-* Power Electronics
-* MATLAB/Simulink Modeling
-* Autonomous Systems
-
----
-
-# License
-
-This repository is intended for:
-
-* academic use,
-* research purposes,
-* engineering education,
-* aerospace control system studies.
+* aerospace GNC systems,
+* modern autonomous space missions.
